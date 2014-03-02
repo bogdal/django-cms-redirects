@@ -21,37 +21,39 @@ def remove_query(path):
 
 
 class RedirectFallbackMiddleware(object):
-    def process_exception(self, request, exception):
-        if isinstance(exception, http.Http404):
 
-            # First try the whole path.
-            path = request.get_full_path()
-            r = get_redirect(path)
+    def process_response(self, request, response):
 
-            # It could be that we need to try without a trailing slash.
-            if r is None and settings.APPEND_SLASH:
-                r = get_redirect(remove_slash(path))
+        if response.status_code != 404:
+            return response
 
-            # It could be that the redirect is defined without a query string.
-            if r is None and path.count('?'):
-                r = get_redirect(remove_query(path))
+        # First try the whole path.
+        path = request.get_full_path()
+        r = get_redirect(path)
 
-            # It could be that we need to try without query string and without a trailing slash.
-            if r is None and path.count('?') and settings.APPEND_SLASH:
-                r = get_redirect(remove_slash(remove_query(path)))
+        # It could be that we need to try without a trailing slash.
+        if r is None and settings.APPEND_SLASH:
+            r = get_redirect(remove_slash(path))
 
+        # It could be that the redirect is defined without a query string.
+        if r is None and path.count('?'):
+            r = get_redirect(remove_query(path))
 
-            if r is not None:
-                if r.page:
-                    if r.response_code == '302':
-                        return http.HttpResponseRedirect(r.page.get_absolute_url())
-                    else:
-                        return http.HttpResponsePermanentRedirect(r.page.get_absolute_url())
-                if r.new_path == '':
-                    return http.HttpResponseGone()
+        # It could be that we need to try without query string and without a trailing slash.
+        if r is None and path.count('?') and settings.APPEND_SLASH:
+            r = get_redirect(remove_slash(remove_query(path)))
+
+        if r is not None:
+            if r.page:
                 if r.response_code == '302':
-                    return http.HttpResponseRedirect(r.new_path)
+                    return http.HttpResponseRedirect(r.page.get_absolute_url())
                 else:
-                    return http.HttpResponsePermanentRedirect(r.new_path)
+                    return http.HttpResponsePermanentRedirect(r.page.get_absolute_url())
+            if r.new_path == '':
+                return http.HttpResponseGone()
+            if r.response_code == '302':
+                return http.HttpResponseRedirect(r.new_path)
+            else:
+                return http.HttpResponsePermanentRedirect(r.new_path)
 
-
+        return response
